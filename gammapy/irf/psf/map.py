@@ -70,6 +70,51 @@ class PSFMap(IRFMap):
     def __init__(self, psf_map, exposure_map=None):
         super().__init__(irf_map=psf_map, exposure_map=exposure_map)
 
+    @classmethod
+    def from_hdulist(
+        cls,
+        hdulist,
+        hdu=None,
+        hdu_bands=None,
+        exposure_hdu=None,
+        exposure_hdu_bands=None,
+    ):
+        """Create from `~astropy.io.fits.HDUList`.
+
+        Parameters
+        ----------
+        hdulist : `~astropy.fits.HDUList`
+            HDU list.
+        hdu : str
+            Name or index of the HDU with the IRF map.
+        hdu_bands : str
+            Name or index of the HDU with the IRF map BANDS table.
+        exposure_hdu : str
+            Name or index of the HDU with the exposure map data.
+        exposure_hdu_bands : str
+            Name or index of the HDU with the exposure map BANDS table.
+
+        Returns
+        -------
+        psf_map : `PSFMap`
+            PSF map.
+        """
+        rad_axis = MapAxis.from_table_hdu(hdulist["THETA"], format="gtpsf")
+
+        table = Table.read(hdulist["PSF"])
+        energy_axis_true = MapAxis.from_table(table, format="gtpsf")
+
+        geom_psf = RegionGeom.create(region=None, axes=[rad_axis, energy_axis_true])
+
+        psf_map = Map.from_geom(geom=geom_psf, data=table["Psf"].data, unit="sr-1")
+
+        geom_exposure = geom_psf.squash("rad")
+        exposure_map = Map.from_geom(
+            geom=geom_exposure, data=table["Exposure"].data, unit="cm2 s"
+        )
+
+        return cls(psf_map=psf_map, exposure_map=exposure_map)
+
     @property
     def psf_map(self):
         return self._irf_map

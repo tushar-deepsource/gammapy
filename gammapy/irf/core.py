@@ -570,7 +570,6 @@ class IRFMap:
         hdu_bands=None,
         exposure_hdu=None,
         exposure_hdu_bands=None,
-        format="gadf",
     ):
         """Create from `~astropy.io.fits.HDUList`.
 
@@ -586,51 +585,31 @@ class IRFMap:
             Name or index of the HDU with the exposure map data.
         exposure_hdu_bands : str
             Name or index of the HDU with the exposure map BANDS table.
-        format : {"gadf", "gtpsf"}
-            File format
 
         Returns
         -------
         irf_map : `IRFMap`
             IRF map.
         """
-        if format == "gadf":
-            if hdu is None:
-                hdu = IRF_MAP_HDU_SPECIFICATION[cls.tag]
+        if hdu is None:
+            hdu = IRF_MAP_HDU_SPECIFICATION[cls.tag]
 
-            irf_map = Map.from_hdulist(
-                hdulist, hdu=hdu, hdu_bands=hdu_bands, format=format
+        irf_map = Map.from_hdulist(
+            hdulist, hdu=hdu, hdu_bands=hdu_bands, format="gadf"
+        )
+
+        if exposure_hdu is None:
+            exposure_hdu = IRF_MAP_HDU_SPECIFICATION[cls.tag] + "_exposure"
+
+        if exposure_hdu in hdulist:
+            exposure_map = Map.from_hdulist(
+                hdulist,
+                hdu=exposure_hdu,
+                hdu_bands=exposure_hdu_bands,
+                format="gadf",
             )
-
-            if exposure_hdu is None:
-                exposure_hdu = IRF_MAP_HDU_SPECIFICATION[cls.tag] + "_exposure"
-
-            if exposure_hdu in hdulist:
-                exposure_map = Map.from_hdulist(
-                    hdulist,
-                    hdu=exposure_hdu,
-                    hdu_bands=exposure_hdu_bands,
-                    format=format,
-                )
-            else:
-                exposure_map = None
-        elif format == "gtpsf":
-            rad_axis = MapAxis.from_table_hdu(hdulist["THETA"], format=format)
-
-            table = Table.read(hdulist["PSF"])
-            energy_axis_true = MapAxis.from_table(table, format=format)
-
-            geom_psf = RegionGeom.create(region=None, axes=[rad_axis, energy_axis_true])
-
-            psf_map = Map.from_geom(geom=geom_psf, data=table["Psf"].data, unit="sr-1")
-
-            geom_exposure = geom_psf.squash("rad")
-            exposure_map = Map.from_geom(
-                geom=geom_exposure, data=table["Exposure"].data, unit="cm2 s"
-            )
-            return cls(psf_map=psf_map, exposure_map=exposure_map)
         else:
-            raise ValueError(f"Format {format} not supported")
+            exposure_map = None
 
         return cls(irf_map, exposure_map)
 
